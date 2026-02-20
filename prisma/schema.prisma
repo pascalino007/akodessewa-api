@@ -1,0 +1,772 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ──────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  MANAGER
+  ACCOUNTANT
+  LOGISTICS
+  SUPPLIER
+  MECHANIC
+  CUSTOMER
+}
+
+enum VehicleType {
+  AUTO
+  MOTO
+}
+
+enum FuelType {
+  GASOLINE
+  DIESEL
+  ELECTRIC
+  HYBRID
+  PLUGIN_HYBRID
+  LPG
+}
+
+enum TransmissionType {
+  MANUAL
+  AUTOMATIC
+  CVT
+  DCT
+  SEMI_AUTOMATIC
+}
+
+enum ProductCondition {
+  NEW
+  USED
+  REFURBISHED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  REFUNDED
+  RETURNED
+}
+
+enum OrderItemStatus {
+  ACTIVE
+  CANCELLED
+  RETURNED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  MOBILE_MONEY
+  CARD
+  BANK_TRANSFER
+  CASH_ON_DELIVERY
+  WALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PromotionType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  BUY_X_GET_Y
+  FREE_SHIPPING
+}
+
+enum UsedVehicleType {
+  CAR
+  MOTORCYCLE
+  BUS
+  TRUCK
+  VAN
+  SUV
+}
+
+enum VehicleCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+}
+
+enum UsedVehicleStatus {
+  ACTIVE
+  SOLD
+  RESERVED
+  EXPIRED
+  REMOVED
+}
+
+enum ChatRoomType {
+  DIRECT
+  GROUP
+  SUPPORT
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+}
+
+enum WalletTransactionType {
+  CREDIT
+  DEBIT
+  WITHDRAWAL
+  COMMISSION
+  REFUND
+}
+
+enum WalletTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum SubscriptionPlan {
+  BASIC
+  PREMIUM
+  VIP
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  SUSPENDED
+}
+
+// ─── USER & AUTH ────────────────────────────────────────────────────────────────
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  phone      String?  @unique
+  password   String
+  role       Role     @default(CUSTOMER)
+  isActive   Boolean  @default(true)
+  isVerified Boolean  @default(false)
+  firstName  String?
+  lastName   String?
+  avatar     String?
+  language   String   @default("fr")
+  currency   String   @default("XOF")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  addresses     Address[]
+  garage        GarageVehicle[]
+  orders        Order[]
+  shop          Shop?
+  reviews       Review[]
+  chatRooms     ChatParticipant[]
+  messages      ChatMessage[]
+  usedVehicles  UsedVehicle[]
+  wallet        Wallet?
+  subscription  Subscription?
+  notifications Notification[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Address {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String?
+  street    String
+  city      String
+  state     String?
+  country   String
+  zipCode   String?
+  lat       Float?
+  lng       Float?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+}
+
+// ─── SHOP & SUPPLIER ────────────────────────────────────────────────────────────
+
+model Shop {
+  id            String   @id @default(uuid())
+  ownerId       String   @unique
+  owner         User     @relation(fields: [ownerId], references: [id])
+  name          String
+  slug          String   @unique
+  description   String?
+  logo          String?
+  banner        String?
+  phone         String?
+  email         String?
+  website       String?
+  street        String?
+  city          String?
+  country       String?
+  lat           Float?
+  lng           Float?
+  isActive      Boolean  @default(true)
+  isVerified    Boolean  @default(false)
+  rating        Float    @default(0)
+  totalSales    Int      @default(0)
+  businessHours Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  products          Product[]
+  orders            Order[]
+  deliveryPersonnel DeliveryPerson[]
+  shopImages        ShopImage[]
+}
+
+model ShopImage {
+  id     String @id @default(uuid())
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  url    String
+  order  Int    @default(0)
+}
+
+// ─── CATALOG ────────────────────────────────────────────────────────────────────
+
+model Category {
+  id          String      @id @default(uuid())
+  name        String
+  slug        String      @unique
+  description String?
+  image       String?
+  parentId    String?
+  parent      Category?   @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[]  @relation("CategoryTree")
+  type        VehicleType @default(AUTO)
+  isActive    Boolean     @default(true)
+  order       Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  products Product[]
+}
+
+model Brand {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  logo      String?
+  country   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  products Product[]
+}
+
+model Product {
+  id              String           @id @default(uuid())
+  name            String
+  slug            String           @unique
+  description     String?
+  sku             String?          @unique
+  partNumber      String?
+  oemNumber       String?
+  price           Decimal          @db.Decimal(10, 2)
+  comparePrice    Decimal?         @db.Decimal(10, 2)
+  cost            Decimal?         @db.Decimal(10, 2)
+  currency        String           @default("XOF")
+  stock           Int              @default(0)
+  minStock        Int              @default(1)
+  weight          Float?
+  condition       ProductCondition @default(NEW)
+  vehicleType     VehicleType      @default(AUTO)
+  material        String?
+  color           String?
+  countryOfOrigin String?
+  warranty        String?
+  isActive        Boolean          @default(true)
+  isFeatured      Boolean          @default(false)
+  rating          Float            @default(0)
+  reviewCount     Int              @default(0)
+  salesCount      Int              @default(0)
+  viewCount       Int              @default(0)
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  brandId    String?
+  brand      Brand?    @relation(fields: [brandId], references: [id])
+  shopId        String?
+  shop          Shop?     @relation(fields: [shopId], references: [id])
+  parentId      String?
+  parent        Product?  @relation("ProductClones", fields: [parentId], references: [id])
+  clones        Product[] @relation("ProductClones")
+  isClone       Boolean   @default(false)
+
+  images             ProductImage[]
+  specifications     ProductSpecification[]
+  compatibleCars     ProductCompatibility[]
+  orderItems         OrderItem[]
+  reviews            Review[]
+  promotionProducts  PromotionProduct[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProductImage {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String?
+  isMain    Boolean @default(false)
+  order     Int     @default(0)
+}
+
+model ProductSpecification {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  key       String
+  value     String
+}
+
+// ─── CAR REGISTRY ───────────────────────────────────────────────────────────────
+
+model Car {
+  id           String           @id @default(uuid())
+  year         Int
+  make         String
+  model        String
+  trim         String?
+  engine       String?
+  displacement String?
+  fuelType     FuelType         @default(GASOLINE)
+  transmission TransmissionType @default(MANUAL)
+  bodyType     String?
+  driveType    String?
+  vehicleType  VehicleType      @default(AUTO)
+  isActive     Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+
+  compatibleProducts ProductCompatibility[]
+  garageEntries      GarageVehicle[]
+
+  @@unique([year, make, model, trim, engine])
+}
+
+model ProductCompatibility {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  carId     String
+  car       Car     @relation(fields: [carId], references: [id], onDelete: Cascade)
+  notes     String?
+
+  @@unique([productId, carId])
+}
+
+// ─── USER GARAGE ────────────────────────────────────────────────────────────────
+
+model GarageVehicle {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  carId       String
+  car         Car      @relation(fields: [carId], references: [id])
+  vin         String?
+  nickname    String?
+  mileage     Int?
+  color       String?
+  plateNumber String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── ORDERS ─────────────────────────────────────────────────────────────────────
+
+model Order {
+  id                String      @id @default(uuid())
+  orderNumber       String      @unique
+  userId            String
+  user              User        @relation(fields: [userId], references: [id])
+  shopId            String
+  shop              Shop        @relation(fields: [shopId], references: [id])
+  addressId         String?
+  address           Address?    @relation(fields: [addressId], references: [id])
+  status            OrderStatus @default(PENDING)
+  subtotal          Decimal     @db.Decimal(10, 2)
+  shippingFee       Decimal     @default(0) @db.Decimal(10, 2)
+  discount          Decimal     @default(0) @db.Decimal(10, 2)
+  tax               Decimal     @default(0) @db.Decimal(10, 2)
+  total             Decimal     @db.Decimal(10, 2)
+  currency          String      @default("XOF")
+  notes             String?
+  cancelReason      String?
+  deliveryPersonId  String?
+  deliveryPerson    DeliveryPerson? @relation(fields: [deliveryPersonId], references: [id])
+  estimatedDelivery DateTime?
+  deliveredAt       DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  items         OrderItem[]
+  payment       Payment?
+  statusHistory OrderStatusHistory[]
+}
+
+model OrderItem {
+  id           String          @id @default(uuid())
+  orderId      String
+  order        Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product         @relation(fields: [productId], references: [id])
+  quantity     Int
+  price        Decimal         @db.Decimal(10, 2)
+  total        Decimal         @db.Decimal(10, 2)
+  status       OrderItemStatus @default(ACTIVE)
+  cancelReason String?
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(uuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  note      String?
+  changedBy String?
+  createdAt DateTime    @default(now())
+}
+
+// ─── PAYMENTS ───────────────────────────────────────────────────────────────────
+
+model Payment {
+  id            String        @id @default(uuid())
+  orderId       String        @unique
+  order         Order         @relation(fields: [orderId], references: [id])
+  amount        Decimal       @db.Decimal(10, 2)
+  currency      String        @default("XOF")
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  provider      String?
+  providerRef   String?
+  metadata      Json?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+// ─── PROMOTIONS ─────────────────────────────────────────────────────────────────
+
+model Promotion {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  code        String?       @unique
+  type        PromotionType
+  value       Decimal       @db.Decimal(10, 2)
+  minPurchase Decimal?      @db.Decimal(10, 2)
+  maxDiscount Decimal?      @db.Decimal(10, 2)
+  usageLimit  Int?
+  usageCount  Int           @default(0)
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean       @default(true)
+  shopId      String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  products PromotionProduct[]
+}
+
+model PromotionProduct {
+  id          String    @id @default(uuid())
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, productId])
+}
+
+// ─── USED VEHICLES MARKETPLACE ──────────────────────────────────────────────────
+
+model UsedVehicle {
+  id           String            @id @default(uuid())
+  sellerId     String
+  seller       User              @relation(fields: [sellerId], references: [id])
+  type         UsedVehicleType
+  make         String
+  model        String
+  year         Int
+  price        Decimal           @db.Decimal(10, 2)
+  currency     String            @default("XOF")
+  mileage      Int?
+  condition    VehicleCondition
+  fuelType     FuelType?
+  transmission TransmissionType?
+  color        String?
+  engine       String?
+  description  String?
+  location     String?
+  city         String?
+  country      String?
+  status       UsedVehicleStatus @default(ACTIVE)
+  isFeatured   Boolean           @default(false)
+  viewCount    Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  images   UsedVehicleImage[]
+  features UsedVehicleFeature[]
+}
+
+model UsedVehicleImage {
+  id        String      @id @default(uuid())
+  vehicleId String
+  vehicle   UsedVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  url       String
+  isMain    Boolean     @default(false)
+  order     Int         @default(0)
+}
+
+model UsedVehicleFeature {
+  id        String      @id @default(uuid())
+  vehicleId String
+  vehicle   UsedVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  feature   String
+}
+
+// ─── DELIVERY ───────────────────────────────────────────────────────────────────
+
+model DeliveryPerson {
+  id              String   @id @default(uuid())
+  shopId          String
+  shop            Shop     @relation(fields: [shopId], references: [id])
+  firstName       String
+  lastName        String
+  phone           String
+  email           String?
+  avatar          String?
+  vehicleType     String?
+  vehiclePlate    String?
+  isActive        Boolean  @default(true)
+  isAvailable     Boolean  @default(true)
+  rating          Float    @default(0)
+  totalDeliveries Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  orders Order[]
+}
+
+// ─── CHAT ───────────────────────────────────────────────────────────────────────
+
+model ChatRoom {
+  id        String       @id @default(uuid())
+  name      String?
+  type      ChatRoomType @default(DIRECT)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  participants ChatParticipant[]
+  messages     ChatMessage[]
+}
+
+model ChatParticipant {
+  id       String   @id @default(uuid())
+  roomId   String
+  room     ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+  joinedAt DateTime @default(now())
+
+  @@unique([roomId, userId])
+}
+
+model ChatMessage {
+  id        String      @id @default(uuid())
+  roomId    String
+  room      ChatRoom    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User        @relation(fields: [senderId], references: [id])
+  content   String
+  type      MessageType @default(TEXT)
+  fileUrl   String?
+  isRead    Boolean     @default(false)
+  createdAt DateTime    @default(now())
+}
+
+// ─── SLIDES / BANNERS ───────────────────────────────────────────────────────────
+
+model Slide {
+  id        String    @id @default(uuid())
+  title     String?
+  subtitle  String?
+  imageUrl  String
+  linkUrl   String?
+  linkText  String?
+  position  String    @default("home")
+  order     Int       @default(0)
+  isActive  Boolean   @default(true)
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// ─── WALLET ─────────────────────────────────────────────────────────────────────
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  balance   Decimal  @default(0) @db.Decimal(10, 2)
+  currency  String   @default("XOF")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions WalletTransaction[]
+}
+
+model WalletTransaction {
+  id          String                  @id @default(uuid())
+  walletId    String
+  wallet      Wallet                  @relation(fields: [walletId], references: [id])
+  amount      Decimal                 @db.Decimal(10, 2)
+  type        WalletTransactionType
+  status      WalletTransactionStatus @default(PENDING)
+  description String?
+  reference   String?
+  metadata    Json?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+}
+
+// ─── SUBSCRIPTION ───────────────────────────────────────────────────────────────
+
+model Subscription {
+  id        String             @id @default(uuid())
+  userId    String             @unique
+  user      User               @relation(fields: [userId], references: [id])
+  plan      SubscriptionPlan
+  status    SubscriptionStatus @default(ACTIVE)
+  startDate DateTime           @default(now())
+  endDate   DateTime
+  amount    Decimal            @db.Decimal(10, 2)
+  currency  String             @default("XOF")
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+// ─── REVIEWS ────────────────────────────────────────────────────────────────────
+
+model Review {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating     Int
+  title      String?
+  comment    String?
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, productId])
+}
+
+// ─── NOTIFICATIONS ──────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String
+  data      Json?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// ─── MECHANICS ──────────────────────────────────────────────────────────────────
+
+model MechanicShop {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  ownerId     String?
+  phone       String?
+  email       String?
+  street      String?
+  city        String?
+  country     String?
+  lat         Float?
+  lng         Float?
+  logo        String?
+  isActive    Boolean  @default(true)
+  isVerified  Boolean  @default(false)
+  rating      Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  services MechanicService[]
+  images   MechanicShopImage[]
+}
+
+model MechanicService {
+  id          String       @id @default(uuid())
+  shopId      String
+  shop        MechanicShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  price       Decimal?     @db.Decimal(10, 2)
+  duration    String?
+}
+
+model MechanicShopImage {
+  id     String       @id @default(uuid())
+  shopId String
+  shop   MechanicShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  url    String
+  order  Int          @default(0)
+}
+
+// ─── VIN LOOKUP CACHE ───────────────────────────────────────────────────────────
+
+model VinLookup {
+  id        String   @id @default(uuid())
+  vin       String   @unique
+  data      Json
+  createdAt DateTime @default(now())
+}
