@@ -89,8 +89,8 @@ jobs:
         password: Android@2026
         script: |
           # Create deployment directory if it doesn't exist
-          mkdir -p /opt/akodessewa-api
-          cd /opt/akodessewa-api
+          mkdir -p /akodessewa-api
+          cd /akodessewa-api
           
           # Backup current deployment
           if [ -d "backup" ]; then rm -rf backup; fi
@@ -101,9 +101,9 @@ jobs:
           if [ -d "prisma" ]; then mv prisma backup/; fi
           
           # Stop running application
-          if pgrep -f "node dist/main"; then
-            pkill -f "node dist/main"
-            sleep 3
+          if pm2 list | grep -q "akodessewa-api"; then
+            pm2 stop akodessewa-api
+            pm2 delete akodessewa-api
           fi
           
           # Clean up old files
@@ -116,7 +116,7 @@ jobs:
         username: root
         password: Android@2026
         source: "deploy.tar.gz"
-        target: "/opt/akodessewa-api/"
+        target: "/akodessewa-api/"
         strip_components: 0
     
     - name: Extract and setup on VPS
@@ -126,7 +126,7 @@ jobs:
         username: root
         password: Android@2026
         script: |
-          cd /opt/akodessewa-api
+          cd /akodessewa-api
           
           # Extract deployment package
           tar -xzf deploy.tar.gz
@@ -135,15 +135,20 @@ jobs:
           # Run database migrations
           npm run prisma:migrate:prod
           
-          # Start the application
-          nohup npm run start:prod > app.log 2>&1 &
+          # Start the application with PM2 on port 4045
+          PORT=4045 pm2 start dist/main.js --name "akodessewa-api"
+          
+          # Save PM2 configuration
+          pm2 save
+          pm2 startup
           
           # Verify application is running
           sleep 5
-          if pgrep -f "node dist/main"; then
-            echo "Application started successfully"
+          if pm2 list | grep -q "akodessewa-api"; then
+            echo "Application started successfully on port 4045"
+            pm2 status
           else
             echo "Application failed to start"
-            tail -20 app.log
+            pm2 logs akodessewa-api --lines 20
             exit 1
           fi

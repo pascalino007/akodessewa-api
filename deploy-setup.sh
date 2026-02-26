@@ -36,12 +36,12 @@ sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE akodessewa_db TO akod
 
 # Create deployment directory
 echo "📁 Creating deployment directory..."
-mkdir -p /opt/akodessewa-api
-chown -R root:root /opt/akodessewa-api
+mkdir -p /akodessewa-api
+chown -R root:root /akodessewa-api
 
 # Create PM2 ecosystem file
 echo "⚙️ Creating PM2 configuration..."
-cat > /opt/akodessewa-api/ecosystem.config.js << 'EOF'
+cat > /akodessewa-api/ecosystem.config.js << 'EOF'
 module.exports = {
   apps: [{
     name: 'akodessewa-api',
@@ -50,11 +50,11 @@ module.exports = {
     exec_mode: 'cluster',
     env: {
       NODE_ENV: 'production',
-      PORT: 3000
+      PORT: 4045
     },
-    error_file: '/opt/akodessewa-api/logs/err.log',
-    out_file: '/opt/akodessewa-api/logs/out.log',
-    log_file: '/opt/akodessewa-api/logs/combined.log',
+    error_file: '/akodessewa-api/logs/err.log',
+    out_file: '/akodessewa-api/logs/out.log',
+    log_file: '/akodessewa-api/logs/combined.log',
     time: true,
     max_memory_restart: '1G',
     node_args: '--max-old-space-size=1024'
@@ -63,12 +63,12 @@ module.exports = {
 EOF
 
 # Create logs directory
-mkdir -p /opt/akodessewa-api/logs
+mkdir -p /akodessewa-api/logs
 
 # Setup firewall
 echo "🔥 Setting up firewall..."
 ufw allow ssh
-ufw allow 3000
+ufw allow 4045
 ufw --force enable
 
 # Create systemd service for auto-restart
@@ -81,8 +81,8 @@ After=network.target
 [Service]
 Type=forking
 User=root
-WorkingDirectory=/opt/akodessewa-api
-ExecStart=/usr/bin/pm2 start /opt/akodessewa-api/ecosystem.config.js
+WorkingDirectory=/akodessewa-api
+ExecStart=/usr/bin/pm2 start /akodessewa-api/ecosystem.config.js
 ExecReload=/usr/bin/pm2 reload akodessewa-api
 ExecStop=/usr/bin/pm2 stop akodessewa-api
 Restart=always
@@ -100,8 +100,8 @@ echo ""
 echo "📋 Next steps:"
 echo "1. Update your .env file on the VPS with production values"
 echo "2. Set up your database connection string in .env"
-echo "3. The GitHub Actions workflow will deploy to /opt/akodessewa-api"
-echo "4. Your API will be available at http://168.231.101.119:3000"
+echo "3. The GitHub Actions workflow will deploy to /akodessewa-api"
+echo "4. Your API will be available at http://168.231.101.119:4045"
 echo ""
 echo "🔐 Security reminders:"
 echo "- Change the default PostgreSQL password"
