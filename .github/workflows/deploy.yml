@@ -1,0 +1,149 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Generate Prisma Client
+      run: npx prisma generate
+    
+    - name: Run linting
+      run: npm run lint
+    
+    - name: Build application
+      run: npm run build
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Generate Prisma Client
+      run: npx prisma generate
+    
+    - name: Build application
+      run: npm run build
+    
+    - name: Create deployment package
+      run: |
+        tar -czf deploy.tar.gz \
+          dist/ \
+          node_modules/ \
+          package.json \
+          package-lock.json \
+          prisma/ \
+          .env.example
+    
+    - name: Deploy to VPS
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 168.231.101.119
+        username: root
+        password: Android@2026
+        script: |
+          # Create deployment directory if it doesn't exist
+          mkdir -p /opt/akodessewa-api
+          cd /opt/akodessewa-api
+          
+          # Backup current deployment
+          if [ -d "backup" ]; then rm -rf backup; fi
+          if [ -d "dist" ]; then mv dist backup; fi
+          if [ -d "node_modules" ]; then mv node_modules backup/; fi
+          if [ -f "package.json" ]; then mv package.json backup/; fi
+          if [ -f "package-lock.json" ]; then mv package-lock.json backup/; fi
+          if [ -d "prisma" ]; then mv prisma backup/; fi
+          
+          # Stop running application
+          if pgrep -f "node dist/main"; then
+            pkill -f "node dist/main"
+            sleep 3
+          fi
+          
+          # Clean up old files
+          rm -rf dist node_modules package.json package-lock.json prisma
+    
+    - name: Upload files to VPS
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: 168.231.101.119
+        username: root
+        password: Android@2026
+        source: "deploy.tar.gz"
+        target: "/opt/akodessewa-api/"
+        strip_components: 0
+    
+    - name: Extract and setup on VPS
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 168.231.101.119
+        username: root
+        password: Android@2026
+        script: |
+          cd /opt/akodessewa-api
+          
+          # Extract deployment package
+          tar -xzf deploy.tar.gz
+          rm deploy.tar.gz
+          
+          # Run database migrations
+          npm run prisma:migrate:prod
+          
+          # Start the application
+          nohup npm run start:prod > app.log 2>&1 &
+          
+          # Verify application is running
+          sleep 5
+          if pgrep -f "node dist/main"; then
+            echo "Application started successfully"
+          else
+            echo "Application failed to start"
+            tail -20 app.log
+            exit 1
+          fi
