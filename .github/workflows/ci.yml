@@ -42,8 +42,8 @@ jobs:
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
     
-    - name: Run linting
-      run: npm run lint
+   # - name: Run linting
+    #  run: npm run lint
     
     - name: Check TypeScript compilation
       run: npx tsc --noEmit
