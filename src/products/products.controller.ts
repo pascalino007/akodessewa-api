@@ -8,6 +8,13 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { IsString, IsOptional, IsNumber, IsBoolean, IsArray, IsEnum, IsInt, Min } from 'class-validator';
 import { PaginationDto } from '../common/dto/pagination.dto';
 
+class AddProductImageDto {
+  @ApiProperty() @IsString() url: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() alt?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isMain?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) order?: number;
+}
+
 class QueryProductsDto extends PaginationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() search?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() categoryId?: string;
@@ -117,6 +124,30 @@ export class ProductsController {
   @ApiOperation({ summary: 'Get product by ID' })
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(id);
+  }
+
+  @ApiBearerAuth()
+  @Roles(Role.SUPPLIER, Role.ADMIN, Role.MANAGER)
+  @Post(':id/images')
+  @ApiOperation({ summary: 'Add images to product' })
+  addImages(@CurrentUser('id') userId: string, @Param('id') id: string, @Body() images: AddProductImageDto[]) {
+    return this.productsService.addImages(userId, id, images);
+  }
+
+  @ApiBearerAuth()
+  @Roles(Role.SUPPLIER, Role.ADMIN, Role.MANAGER)
+  @Patch(':id/images')
+  @ApiOperation({ summary: 'Update product images' })
+  updateImages(@CurrentUser('id') userId: string, @Param('id') id: string, @Body() images: AddProductImageDto[]) {
+    return this.productsService.updateImages(userId, id, images);
+  }
+
+  @ApiBearerAuth()
+  @Roles(Role.SUPPLIER, Role.ADMIN, Role.MANAGER)
+  @Delete(':id/images')
+  @ApiOperation({ summary: 'Remove all images from product' })
+  removeImages(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.productsService.removeImages(userId, id);
   }
 
   @ApiBearerAuth()
