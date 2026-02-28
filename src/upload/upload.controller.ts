@@ -11,6 +11,7 @@ import {
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiConsumes, ApiBody, ApiProperty } from '@nestjs/swagger';
 import { UploadService } from './upload.service';
+import { Public } from '../common/decorators/public.decorator';
 
 @ApiTags('Upload')
 @ApiBearerAuth()
@@ -58,6 +59,27 @@ export class UploadController {
 
   @Post('batch')
   @ApiOperation({ summary: 'Upload multiple files (max 10)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        files: { type: 'array', items: { type: 'string', format: 'binary' } },
+        folder: { type: 'string' },
+      },
+    },
+  })
+  @UseInterceptors(FilesInterceptor('files', 10, { limits: { fileSize: 10 * 1024 * 1024 } }))
+  uploadBatch(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Query('folder') folder?: string,
+  ) {
+    return this.uploadService.uploadMultiple(files, folder || 'uploads');
+  }
+
+  @Post('multiple')
+  @Public()
+  @ApiOperation({ summary: 'Upload multiple files (alias for /batch)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
