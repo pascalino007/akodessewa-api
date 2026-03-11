@@ -541,4 +541,75 @@ export class ProductsService {
 
     return claimedProduct;
   }
+
+  async addImages(userId: string, productId: string, images: { url: string; alt?: string; isMain?: boolean; order?: number }[]) {
+    // Verify user owns the product
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, shop: { userId } },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found or access denied');
+    }
+
+    // Create images
+    const createdImages = await this.prisma.productImage.createMany({
+      data: images.map((img, index) => ({
+        productId,
+        url: img.url,
+        alt: img.alt || '',
+        isMain: img.isMain || false,
+        order: img.order ?? index,
+      })),
+    });
+
+    return { message: 'Images added successfully', count: createdImages.count };
+  }
+
+  async updateImages(userId: string, productId: string, images: { url: string; alt?: string; isMain?: boolean; order?: number }[]) {
+    // Verify user owns the product
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, shop: { userId } },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found or access denied');
+    }
+
+    // Remove existing images
+    await this.prisma.productImage.deleteMany({
+      where: { productId },
+    });
+
+    // Create new images
+    const createdImages = await this.prisma.productImage.createMany({
+      data: images.map((img, index) => ({
+        productId,
+        url: img.url,
+        alt: img.alt || '',
+        isMain: img.isMain || false,
+        order: img.order ?? index,
+      })),
+    });
+
+    return { message: 'Images updated successfully', count: createdImages.count };
+  }
+
+  async removeImages(userId: string, productId: string) {
+    // Verify user owns the product
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, shop: { userId } },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found or access denied');
+    }
+
+    // Remove all images
+    const result = await this.prisma.productImage.deleteMany({
+      where: { productId },
+    });
+
+    return { message: 'Images removed successfully', count: result.count };
+  }
 }
